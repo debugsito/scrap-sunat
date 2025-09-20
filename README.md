@@ -6,7 +6,7 @@ Una API REST desarrollada con FastAPI para consultar información de empresas en
 
 - **Múltiples tipos de búsqueda**:
   - 🏷️ Por nombre o razón social
-  - 🔢 Por RUC (Registro Único de Contribuyentes)
+  - 🔢 Por RUC (Registro Único de Contribuyentes) - **Optimizado para resultados directos**
   - 📄 Por documento del representante (DNI, Carnet, Pasaporte, Cédula Diplomática)
 - **Consulta individual**: Busca información de una empresa específica
 - **Consulta masiva**: Procesa múltiples registros desde un archivo Excel
@@ -15,6 +15,8 @@ Una API REST desarrollada con FastAPI para consultar información de empresas en
 - **Modo debug**: Navegador visible para depuración
 - **Anti-detección**: Configuraciones realistas del navegador para evitar bloqueos
 - **Validaciones automáticas**: Verificación de formato de RUC, DNI y otros documentos
+- **Datos formateados**: Campos en snake_case con limpieza automática de texto
+- **Búsqueda optimizada por RUC**: Acceso directo sin navegación adicional
 
 ## 🚀 Instalación
 
@@ -80,7 +82,7 @@ GET /consulta/{nombre_empresa}
 curl "http://127.0.0.1:8000/consulta/EMPRESA%20EJEMPLO%20S.A.C."
 ```
 
-#### 2. Consulta por RUC
+#### 2. Consulta por RUC (Optimizada)
 ```
 GET /consulta-ruc/{ruc}
 ```
@@ -89,6 +91,12 @@ GET /consulta-ruc/{ruc}
 ```bash
 curl "http://127.0.0.1:8000/consulta-ruc/20123456789"
 ```
+
+**Características especiales:**
+- ✅ **Acceso directo**: Sin navegación intermedia
+- ⚡ **Más rápida**: Resultado inmediato de SUNAT
+- 🎯 **Datos completos**: Información completa en una sola consulta
+- 🔍 **Sin búsqueda de enlaces**: Procesa directamente la vista de resultado
 
 **Validaciones:**
 - El RUC debe tener exactamente 11 dígitos
@@ -165,19 +173,64 @@ http://127.0.0.1:8000/docs
 Devuelve JSON con la información de la empresa:
 
 ```json
+## 📄 Ejemplos de respuesta
+
+### Formato de datos actualizado
+
+Todos los endpoints ahora devuelven datos **formateados y limpios**:
+
+- 🔤 **Campos en snake_case**: `numero_ruc`, `razon_social`, `estado_contribuyente`, etc.
+- 🧹 **Texto limpio**: Espacios extra, saltos de línea y caracteres especiales removidos
+- 📋 **Campos estandarizados**: Mapeo consistente de nombres de campos
+- ✨ **Valores normalizados**: Estados como "ACTIVO/INACTIVO", "HABIDO/NO HABIDO"
+
+### Consulta por nombre
+```json
 {
-  "nombre": "EMPRESA EJEMPLO S.A.C.",
+  "nombre": "EMPRESA EJEMPLO",
   "tipo_busqueda": "nombre",
   "resultados": [
     {
-      "RUC": "20123456789",
-      "Razón Social": "EMPRESA EJEMPLO SOCIEDAD ANONIMA CERRADA",
-      "Estado del Contribuyente": "ACTIVO",
-      "Condición del Domicilio": "HABIDO",
-      "Dirección": "CAL. EJEMPLO NRO. 123 LIMA - LIMA - SAN ISIDRO"
+      "numero_ruc": "20123456789 - EMPRESA EJEMPLO SOCIEDAD ANONIMA CERRADA",
+      "tipo_contribuyente": "SOCIEDAD ANONIMA CERRADA",
+      "nombre_comercial": "-",
+      "fecha_inscripcion": "01/03/2005",
+      "fecha_inicio_actividades": "01/03/2005",
+      "estado_contribuyente": "ACTIVO",
+      "condicion_contribuyente": "HABIDO",
+      "domicilio_fiscal": "AV. EJEMPLO NRO. 123 LIMA - LIMA - SAN ISIDRO",
+      "sistema_emision_comprobante": "MANUAL",
+      "actividad_comercio_exterior": "SIN ACTIVIDAD",
+      "sistema_contabilidad": "MANUAL/COMPUTARIZADO",
+      "actividades_economicas": "Principal - 7110 - ACTIVIDADES DE ARQUITECTURA E INGENIERÍA...",
+      "comprobantes_pago_autorizados": "FACTURA | BOLETA DE VENTA | NOTA DE CREDITO...",
+      "sistema_emision_electronica": "FACTURA PORTAL DESDE 22/04/2020 | BOLETA PORTAL...",
+      "emisor_electronico_desde": "22/04/2020",
+      "comprobantes_electronicos": "FACTURA (desde 22/04/2020),BOLETA (desde 21/05/2020)...",
+      "afiliado_ple_desde": "-",
+      "padrones": "NINGUNO"
     }
   ]
 }
+```
+
+### Consulta por RUC (Optimizada)
+```json
+{
+  "ruc": "20123456789",
+  "tipo_busqueda": "ruc",
+  "resultados": [
+    {
+      "numero_ruc": "20123456789 - EMPRESA EJEMPLO SOCIEDAD ANONIMA CERRADA",
+      "tipo_contribuyente": "SOCIEDAD ANONIMA CERRADA",
+      "estado_contribuyente": "ACTIVO",
+      "condicion_contribuyente": "HABIDO",
+      "domicilio_fiscal": "AV. EJEMPLO NRO. 123 LIMA - LIMA - SAN ISIDRO",
+      "actividades_economicas": "Principal - 7110 - ACTIVIDADES DE ARQUITECTURA..."
+    }
+  ]
+}
+```
 ```
 
 ### Consulta por RUC

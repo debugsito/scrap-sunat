@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+playwright
+pandas
+openpyxl
+beautifulsoup4
+lxml

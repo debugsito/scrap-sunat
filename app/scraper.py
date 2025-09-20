@@ -5,10 +5,19 @@ import random
 import os
 from .parser import parse_resultado
 
-def scrape_sunat(nombre: str, debug_mode: bool = False) -> list:
+def scrape_sunat(search_value: str, search_type: str = "nombre", document_type: str = "1", debug_mode: bool = False) -> list:
     """
     Scrapes SUNAT website for company information.
-    Returns a list of results or error information.
+    
+    Args:
+        search_value: Valor a buscar (nombre de empresa, RUC o número de documento)
+        search_type: Tipo de búsqueda ("nombre", "ruc", "documento")
+        document_type: Tipo de documento para búsqueda por documento 
+                      ("1"=DNI, "4"=Carnet Extranjería, "7"=Pasaporte, "A"=Cédula Diplomática)
+        debug_mode: Si mostrar el navegador
+    
+    Returns:
+        Lista de resultados o información de error
     """
     results = []
     max_retries = 3
@@ -46,7 +55,7 @@ def scrape_sunat(nombre: str, debug_mode: bool = False) -> list:
                 # Set reasonable timeout
                 page.set_default_timeout(60000)  # Aumentado a 60 segundos
                 
-                print(f"Navegando a SUNAT para buscar: {nombre}")
+                print(f"Navegando a SUNAT para buscar: {search_value} (tipo: {search_type})")
                 
                 # Navigate to the page with wait until load
                 page.goto(
@@ -58,20 +67,42 @@ def scrape_sunat(nombre: str, debug_mode: bool = False) -> list:
                 print("Esperando que la página cargue completamente...")
                 time.sleep(1.5)  # Reducido de 3 a 1.5 segundos
                 
-                # First, click on "Por Nomb./Raz.Soc." button to enable the search field
-                print("Haciendo clic en 'Por Nomb./Raz.Soc.' para activar búsqueda por razón social...")
-                page.wait_for_selector("#btnPorRazonSocial", state="visible", timeout=30000)
-                page.click("#btnPorRazonSocial")
-                time.sleep(0.5)  # Reducido de 1 a 0.5 segundos
+                # Handle different search types
+                if search_type == "nombre":
+                    print("Configurando búsqueda por nombre/razón social...")
+                    # Click on "Por Nomb./Raz.Soc." button to enable the search field
+                    page.wait_for_selector("#btnPorRazonSocial", state="visible", timeout=30000)
+                    page.click("#btnPorRazonSocial")
+                    time.sleep(0.5)
+                    search_field = "#txtNombreRazonSocial"
+                    
+                elif search_type == "ruc":
+                    print("🔍 Configurando búsqueda por RUC...")
+                    search_field = "#txtRuc"
+                    
+                elif search_type == "documento":
+                    print(f"Configurando búsqueda por documento (tipo: {document_type})...")
+                    # Click on "Por Documento" button
+                    page.wait_for_selector("#btnPorDocumento", state="visible", timeout=30000)
+                    page.click("#btnPorDocumento")
+                    time.sleep(0.5)
+                    
+                    # Select document type
+                    page.select_option("#cmbTipoDoc", value=document_type)
+                    time.sleep(0.5)
+                    search_field = "#txtNumeroDocumento"
+                    
+                else:
+                    raise ValueError(f"Tipo de búsqueda no válido: {search_type}. Use 'nombre', 'ruc' o 'documento'")
                 
                 # Wait for the search input to be visible and interactable
                 print("Esperando que el campo de búsqueda esté disponible...")
                 
                 # First wait for the element to exist
-                page.wait_for_selector("#txtNombreRazonSocial", timeout=30000)
+                page.wait_for_selector(search_field, timeout=30000)
                 
                 # Then wait for it to be visible and enabled
-                search_input = page.locator("#txtNombreRazonSocial")
+                search_input = page.locator(search_field)
                 search_input.wait_for(state="visible", timeout=30000)
                 
                 # Check if there are any overlays or modals that might be blocking the element
@@ -93,8 +124,8 @@ def scrape_sunat(nombre: str, debug_mode: bool = False) -> list:
                 
                 # Approach 1: Direct fill
                 try:
-                    print("Intentando llenar el campo directamente...")
-                    search_input.fill(nombre, timeout=10000)
+                    print(f"Intentando llenar el campo directamente con: {search_value}")
+                    search_input.fill(search_value, timeout=10000)
                     input_filled = True
                     print("✓ Campo llenado exitosamente")
                 except Exception as e:
@@ -107,7 +138,7 @@ def scrape_sunat(nombre: str, debug_mode: bool = False) -> list:
                         search_input.click(timeout=10000)
                         time.sleep(0.3)  # Reducido de 0.5 a 0.3 segundos
                         search_input.clear()
-                        search_input.type(nombre, delay=50)  # Reducido de 100 a 50ms
+                        search_input.type(search_value, delay=50)  # Reducido de 100 a 50ms
                         input_filled = True
                         print("✓ Campo llenado con click + type")
                     except Exception as e:
@@ -118,9 +149,9 @@ def scrape_sunat(nombre: str, debug_mode: bool = False) -> list:
                     try:
                         print("Intentando inyección JavaScript...")
                         page.evaluate(f"""
-                            const input = document.querySelector('#txtNombreRazonSocial');
+                            const input = document.querySelector('{search_field}');
                             if (input) {{
-                                input.value = '{nombre}';
+                                input.value = '{search_value}';
                                 input.dispatchEvent(new Event('input', {{ bubbles: true }}));
                                 input.dispatchEvent(new Event('change', {{ bubbles: true }}));
                             }}
@@ -131,7 +162,7 @@ def scrape_sunat(nombre: str, debug_mode: bool = False) -> list:
                         print(f"✗ Fallo JavaScript: {str(e)}")
                         raise Exception(f"No se pudo llenar el campo de búsqueda después de múltiples intentos: {str(e)}")
                 
-                time.sleep(1)
+                time.sleep(0.5)  # Reducido de 1 a 0.5 segundos
                 
                 # Wait for search button to be visible and click it
                 print("Haciendo click en buscar...")
@@ -140,22 +171,50 @@ def scrape_sunat(nombre: str, debug_mode: bool = False) -> list:
                 
                 # Wait for results with longer timeout
                 print("Esperando resultados...")
-                try:
-                    page.wait_for_selector(".aRucs", timeout=20000)
-                except:
-                    # Try to check if there's a "no results" message
-                    no_results = page.query_selector_all("text=No se encontraron")
-                    if no_results:
+                
+                # Para búsqueda por RUC, la página muestra directamente el resultado
+                if search_type == "ruc":
+                    try:
+                        print("🔍 Búsqueda por RUC - esperando resultado directo...")
+                        page.wait_for_selector(".panel.panel-primary", timeout=20000)
+                        time.sleep(1)
+                        
+                        html = page.content()
+                        result = parse_resultado(html)
+                        
+                        # Verificar si realmente hay datos
+                        if result and "error" not in result:
+                            print("✅ Resultado de RUC obtenido exitosamente")
+                            browser.close()
+                            return [result]
+                        else:
+                            print("❌ No se encontraron datos para el RUC")
+                            browser.close()
+                            return [{"error": "No se encontraron datos para el RUC especificado"}]
+                            
+                    except Exception as e:
+                        print(f"❌ Error al obtener resultado directo de RUC: {e}")
+                        browser.close()
+                        return [{"error": f"Error al obtener datos del RUC: {str(e)}"}]
+                
+                # Para búsquedas por nombre y documento, buscar enlaces
+                else:
+                    try:
+                        page.wait_for_selector(".aRucs", timeout=20000)
+                    except:
+                        # Try to check if there's a "no results" message
+                        no_results = page.query_selector_all("text=No se encontraron")
+                        if no_results:
+                            browser.close()
+                            return [{"error": "No se encontraron resultados para la búsqueda"}]
+                        raise
+
+                    links = page.query_selector_all("a.aRucs")
+                    print(f"Encontrados {len(links)} resultados")
+                    
+                    if not links:
                         browser.close()
                         return [{"error": "No se encontraron resultados para la búsqueda"}]
-                    raise
-
-                links = page.query_selector_all("a.aRucs")
-                print(f"Encontrados {len(links)} resultados")
-                
-                if not links:
-                    browser.close()
-                    return [{"error": "No se encontraron resultados para la búsqueda"}]
                 
                 for i in range(len(links)):
                     try:
